@@ -20,11 +20,11 @@ KRAP_CONNECTION_STRING = (
 isTest = False  # Set to True for testing, False for production
 # Paths
 
-source_folder = r"\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000"
+SOURCE_FOLDER = r"\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000"
 
-staging_folder = os.path.join(os.path.dirname(__file__), "staging")
-num_extracts_to_keep = 7
+STAGING_FOLDER = os.path.join(os.path.dirname(__file__), "staging")
+NUM_EXTRACTS_TO_KEEP = 7
 if isTest:
-    destination_folder = os.path.join(os.path.dirname(__file__), "test_destination")
+    DESTINATION_FOLDER = os.path.join(os.path.dirname(__file__), "test_destination")
 else:
-    destination_folder = r"\\kfcu\share\PR\MIS\ASD Area\HubSpot"
+    DESTINATION_FOLDER = r"\\kfcu\share\PR\MIS\ASD Area\HubSpot"

@@ -1,6 +1,7 @@
 # .gitignore
 venv/
 staging/
+__pycache__/
 
 # Ignore logs
 logs/

@@ -9,16 +9,16 @@ import zipfile
 import sys
 import re
 from constants import (
-    source_folder,
-    staging_folder,
-    destination_folder,
+    SOURCE_FOLDER,
+    STAGING_FOLDER,
+    DESTINATION_FOLDER,
     isTest,
-    num_extracts_to_keep,
+    NUM_EXTRACTS_TO_KEEP,
 )
 
-os.makedirs(staging_folder, exist_ok=True)
+os.makedirs(STAGING_FOLDER, exist_ok=True)
 if isTest:
-    os.makedirs(destination_folder, exist_ok=True)
+    os.makedirs(DESTINATION_FOLDER, exist_ok=True)
 
 files = []
 
@@ -102,7 +102,6 @@ def copy_files_to_network(files, source_folder, network_folder):
     pattern = os.path.join(os.path.join(source_folder, yesterday), "EXTRACT.*")
     extract_files = glob.glob(pattern)
     try:
-        x = 10
         for src_path in extract_files:
             filename = os.path.basename(src_path)
             if filename == "EXTRACT.CARD":
@@ -111,9 +110,6 @@ def copy_files_to_network(files, source_folder, network_folder):
             shutil.copyfile(src_path, dest_path)
             print(f"Copied {src_path} to {dest_path}")
             logger.info(f"Copied {src_path} to {dest_path}")
-            x = x - 1
-            if x == 0:
-                break  # testing
         print("Files successfully copied to network folder...")
         logger.info("Files successfully copied to network folder...")
     except:
@@ -190,12 +186,12 @@ def cleanup_network_folder(network_folder, yesterday):
         logger.warning(f"Zip file not found: {zip_file}")
 
 
-def keep_latest_number_of_extracts(destination_folder, num_extracts=7):
+def keep_latest_number_of_extracts(DESTINATION_FOLDER, NUM_EXTRACTS_TO_KEEP):
     # Regex to match filenames like 20240618.zip
     pattern = re.compile(r"^(\d{8})\.zip$")
     files = []
 
-    for filename in os.listdir(destination_folder):
+    for filename in os.listdir(DESTINATION_FOLDER):
         match = pattern.match(filename)
         if match:
             date_str = match.group(1)
@@ -208,27 +204,27 @@ def keep_latest_number_of_extracts(destination_folder, num_extracts=7):
     # Sort files by date descending
     files.sort(reverse=True)
     # Keep only the latest num_extracts
-    for _, filename in files[num_extracts:]:
-        file_path = os.path.join(destination_folder, filename)
+    for _, filename in files[NUM_EXTRACTS_TO_KEEP:]:
+        file_path = os.path.join(DESTINATION_FOLDER, filename)
         os.remove(file_path)
 
 
 # Main function
-def main():
-    start_time = time.time()
+def main(start_time):
+
     try:
         # Define schedule
         today = date.today()
         yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
 
         # Find subfolder(YYYYMMDD) in source_folder ("\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000")
-        subfolder_path = os.path.join(source_folder, yesterday)
+        subfolder_path = os.path.join(SOURCE_FOLDER, yesterday)
         extract_card_path = os.path.join(subfolder_path, "EXTRACT.CARD")
 
         if os.path.exists(extract_card_path):
-            if not os.path.exists(staging_folder):
-                os.makedirs(staging_folder, exist_ok=True)
-            dest_path = os.path.join(staging_folder, "EXTRACT.CARD")
+            if not os.path.exists(STAGING_FOLDER):
+                os.makedirs(STAGING_FOLDER, exist_ok=True)
+            dest_path = os.path.join(STAGING_FOLDER, "EXTRACT.CARD")
             shutil.copyfile(extract_card_path, dest_path)
             print(f"Copied {extract_card_path} to {dest_path}")
             logger.info(f"Copied {extract_card_path} to {dest_path}")
@@ -246,31 +242,31 @@ def main():
 
         # Save the processed DataFrame to CSV in the same format as the original
         print("Saving masked card extract...")
-        save_masked_card_extract(df, staging_folder)
+        save_masked_card_extract(df, STAGING_FOLDER)
 
         # Add the CSV file path to the list of files to copy
-        files.append((staging_folder, f"EXTRACT.CARD_masked.txt"))
+        files.append((STAGING_FOLDER, f"EXTRACT.CARD_masked.txt"))
 
         # Copy files to the network folder
         print("Copying files to network folder...")
         logger.info("Copying files to network folder...")
-        copy_files_to_network(files, source_folder, destination_folder)
+        copy_files_to_network(files, SOURCE_FOLDER, DESTINATION_FOLDER)
 
         print("Zipping network folder...")
         logger.info("Zipping network folder...")
-        zip_network_folder(destination_folder, yesterday)
+        zip_network_folder(DESTINATION_FOLDER, yesterday)
 
         print("Cleaning up network folder...")
         logger.info("Cleaning up network folder...")
-        cleanup_network_folder(destination_folder, yesterday)
+        cleanup_network_folder(DESTINATION_FOLDER, yesterday)
 
         print("Cleaning up staging folder...")
         logger.info("Cleaning up staging folder...")
-        cleanup_staging_folder(staging_folder)
+        cleanup_staging_folder(STAGING_FOLDER)
 
-        print(f"Keeping latest {num_extracts_to_keep} extracts...")
-        logger.info(f"Keeping latest {num_extracts_to_keep} extracts...")
-        keep_latest_number_of_extracts(destination_folder, num_extracts_to_keep)
+        print(f"Keeping latest {NUM_EXTRACTS_TO_KEEP} extracts...")
+        logger.info(f"Keeping latest {NUM_EXTRACTS_TO_KEEP} extracts...")
+        keep_latest_number_of_extracts(DESTINATION_FOLDER, NUM_EXTRACTS_TO_KEEP)
 
     except Exception as ex:
         logger.exception(f"Error in main execution: {ex}")
@@ -284,5 +280,7 @@ def main():
 
 
 if __name__ == "__main__":
+    starting_time = time.time()
     print("Starting HubSpot Export...")
-    main()
+    logger.info("Starting HubSpot Export...")
+    main(starting_time)
