@@ -1,0 +1,33 @@
+# .gitignore
+venv/
+staging/
+
+# Ignore logs
+logs/
+*.log
+
+# Ignore environment files
+.env
+.env.*
+
+# Ignore build output
+dist/
+build/
+out/
+
+# Ignore OS generated files
+.DS_Store
+Thumbs.db
+
+# Ignore Visual Studio Code settings
+.vscode/
+
+# Ignore temporary files
+*.tmp
+*.swp
+*.swo
+
+# Ignore package lock files
+package-lock.json
+yarn.lock
+pnpm-
