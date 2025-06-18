@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import glob
 import time
 from logger_config import logger
@@ -8,6 +8,7 @@ import shutil
 import zipfile
 import sys
 import re
+import json
 from constants import (
     SOURCE_FOLDER,
     STAGING_FOLDER,
@@ -209,14 +210,36 @@ def keep_latest_number_of_extracts(DESTINATION_FOLDER, NUM_EXTRACTS_TO_KEEP):
         os.remove(file_path)
 
 
+def get_process_date():
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    process_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config = json.load(f)
+                if (
+                    "ProcessDate" in config
+                    and config["ProcessDate"]
+                    and str(config["ProcessDate"]).lower() != "null"
+                ):
+                    process_date = config["ProcessDate"]
+            except Exception as e:
+                print(f"Warning: Could not read config.json: {e}")
+    return process_date.strftime("%Y%m%d")
+
+
 # Main function
 def main(start_time):
 
     try:
         # Define schedule
-        today = date.today()
-        yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
-
+        # today = date.today()
+        # yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
+        
+        yesterday = get_process_date()
+        print(f"Using process date: {yesterday}")
+        logger.info(f"Using process date: {yesterday}")
+        
         # Find subfolder(YYYYMMDD) in source_folder ("\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000")
         subfolder_path = os.path.join(SOURCE_FOLDER, yesterday)
         extract_card_path = os.path.join(subfolder_path, "EXTRACT.CARD")
@@ -232,6 +255,7 @@ def main(start_time):
         else:
             print(f"File {extract_card_path} not found.")
             logger.warning(f"File {extract_card_path} not found.")
+            sys.exit(2)
 
         # Process the file and mask the 3rd column
         print("Processing EXTRACT.CARD file...")
