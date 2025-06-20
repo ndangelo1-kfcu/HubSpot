@@ -41,12 +41,18 @@ def cleanup_staging_folder(staging_folder):
         raise
 
 
-def copy_files_to_network(files, yesterday, source_folder, network_folder):
+def copy_files_to_network(files, PROCESSDATE, source_folder, network_folder):
     try:
-        # Ensure the network folder exists and is a directory
-        if not os.path.exists(network_folder):
-            os.makedirs(network_folder, exist_ok=True)
-        elif not os.path.isdir(network_folder):
+        print(f"DEBUG: network_folder = '{network_folder}'")
+        print(f"DEBUG: repr(network_folder) = {repr(network_folder)}")
+        print(f"DEBUG: os.path.exists = {os.path.exists(network_folder)}")
+        print(f"DEBUG: os.path.isdir = {os.path.isdir(network_folder)}")
+        try:
+            print(f"DEBUG: os.listdir(network_folder) = {os.listdir(network_folder)}")
+        except Exception as e:
+            print(f"DEBUG: os.listdir(network_folder) failed: {e}")
+        # Ensure the network folder is a directory
+        if not os.path.isdir(network_folder):
             print(f"Error: The path {network_folder} exists but is not a directory.")
             logger.error(f"The path {network_folder} exists but is not a directory.")
             raise NotADirectoryError(
@@ -79,12 +85,12 @@ def copy_files_to_network(files, yesterday, source_folder, network_folder):
     # yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
 
     # Create a subfolder in the network folder
-    dated_network_folder = os.path.join(network_folder, yesterday)
+    dated_network_folder = os.path.join(network_folder, PROCESSDATE)
     if not os.path.exists(dated_network_folder):
         os.makedirs(dated_network_folder, exist_ok=True)
 
     # Copy the masked EXTRACT.CARD file to the network folder, replacing it if it already exists
-    destination = os.path.join(os.path.join(network_folder, yesterday), filename)
+    destination = os.path.join(os.path.join(network_folder, PROCESSDATE), filename)
     try:
         shutil.copyfile(
             os.path.join(file_path, filename), destination
@@ -100,14 +106,16 @@ def copy_files_to_network(files, yesterday, source_folder, network_folder):
 
     # Copy all all other EXTRACT.* files:
     # Find all files that match EXTRACT.*
-    pattern = os.path.join(os.path.join(source_folder, yesterday), "EXTRACT.*")
+    pattern = os.path.join(os.path.join(source_folder, PROCESSDATE), "EXTRACT.*")
     extract_files = glob.glob(pattern)
     try:
         for src_path in extract_files:
             filename = os.path.basename(src_path)
             if filename == "EXTRACT.CARD":
                 continue  # Skip EXTRACT.CARD
-            dest_path = os.path.join(os.path.join(network_folder, yesterday), filename)
+            dest_path = os.path.join(
+                os.path.join(network_folder, PROCESSDATE), filename
+            )
             shutil.copyfile(src_path, dest_path)
             print(f"Copied {src_path} to {dest_path}")
             logger.info(f"Copied {src_path} to {dest_path}")
@@ -165,9 +173,9 @@ def process_extract_card(PROCESSDATE):
     return df
 
 
-def zip_network_folder(network_folder, yesterday):
-    folder_to_zip = os.path.join(network_folder, yesterday)
-    zip_path = os.path.join(network_folder, f"{yesterday}.zip")
+def zip_network_folder(network_folder, PROCESSDATE):
+    folder_to_zip = os.path.join(network_folder, PROCESSDATE)
+    zip_path = os.path.join(network_folder, f"{PROCESSDATE}.zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(folder_to_zip):
             for file in files:
@@ -192,10 +200,10 @@ def save_masked_card_extract(df, staging_folder):
     logger.info(f"Processed data saved to {csv_file_path}")
 
 
-def cleanup_network_folder(network_folder, yesterday):
+def cleanup_network_folder(network_folder, PROCESSDATE):
     # Path to the dated subfolder and the zip file
-    dated_folder = os.path.join(network_folder, yesterday)
-    zip_file = os.path.join(network_folder, f"{yesterday}.zip")
+    dated_folder = os.path.join(network_folder, PROCESSDATE)
+    zip_file = os.path.join(network_folder, f"{PROCESSDATE}.zip")
 
     # Remove the dated folder and its contents if it exists
     if os.path.exists(dated_folder) and os.path.isdir(dated_folder):
@@ -237,7 +245,7 @@ def keep_latest_number_of_extracts(DESTINATION_FOLDER, NUM_EXTRACTS_TO_KEEP):
 
 def get_process_date():
     config_path = os.path.join(os.path.dirname(__file__), "config.json")
-    process_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    process_date = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             try:
@@ -265,25 +273,8 @@ def main(start_time):
         print(f"Using process date: {PROCESSDATE}")
         logger.info(f"Using process date: {PROCESSDATE}")
 
+        # # Process the file and mask the 3rd column
         print("Processing EXTRACT.CARD file...")
-        # # Find subfolder(YYYYMMDD) in source_folder ("\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000")
-        # subfolder_path = os.path.join(SOURCE_FOLDER, PROCESSDATE)
-        # extract_card_path = os.path.join(subfolder_path, "EXTRACT.CARD")
-
-        # if os.path.exists(extract_card_path):
-        #     if not os.path.exists(STAGING_FOLDER):
-        #         os.makedirs(STAGING_FOLDER, exist_ok=True)
-        #     dest_path = os.path.join(STAGING_FOLDER, "EXTRACT.CARD")
-        #     shutil.copyfile(extract_card_path, dest_path)
-        #     print(f"Copied {extract_card_path} to {dest_path}")
-        #     logger.info(f"Copied {extract_card_path} to {dest_path}")
-
-        # else:
-        #     print(f"File {extract_card_path} not found.")
-        #     logger.warning(f"File {extract_card_path} not found.")
-        #     sys.exit(2)
-
-        # Process the file and mask the 3rd column
         df = process_extract_card(PROCESSDATE)
 
         print(df.head())  # Show a preview or continue processing as needed
@@ -299,7 +290,7 @@ def main(start_time):
         # Copy files to the network folder
         print("Copying files to network folder...")
         logger.info("Copying files to network folder...")
-        copy_files_to_network(files, SOURCE_FOLDER, DESTINATION_FOLDER)
+        copy_files_to_network(files, PROCESSDATE, SOURCE_FOLDER, DESTINATION_FOLDER)
 
         print("Zipping network folder...")
         logger.info("Zipping network folder...")

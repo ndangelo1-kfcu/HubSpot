@@ -1,28 +1,22 @@
 $fileLocation = "\KFCU_SSIS\Live\HubSpot"
 $fileName = "HubSpotETL.py"
-$startTime = Get-Date
-$sendAlert1 = $startTime.AddHours(5)
+$eightAM = Get-Date -Hour 8 -Minute 0 -Second 0
 $endTime = Get-Date -Hour 15 -Minute 0 -Second 0
 $emailSent = $false
 
+# Get ProcessDate from config.json
+$configPath = "\\vsarcu02\c$\KFCU_SSIS\Live\HubSpot\config.json"
+if (Test-Path $configPath) {
+    $config = Get-Content $configPath | ConvertFrom-Json
+    $ProcessDate = $config.ProcessDate
+    Write-Output "ProcessDate from config.json: $ProcessDate"
+} else {
+    Write-Output "config.json not found at $configPath"
+    exit 1
+}
+
 # Navigate to the folder containing the virtual environment and Python script
 Set-Location -Path ("\\vsarcu02\c$\" + $fileLocation)
-
-$sender1 = "svcui@kfcu.org"
-$recipient = "ndangelo@kfcu.org"
-
-function Send-AlertEmail1 { #devprod@kfcu.org
-    Send-MailMessage -To $recipient -From $sender1 `
-        -Subject "HubSpotETL.py Alert" `
-        -Body "HubSpotETL.py has failed to find the daily extract files after 2.5 hours. It will continue to check until 3PM today." `
-        -SmtpServer "mx.kfcu.org"
-}
-function Send-AlertEmail2 { #devprod@kfcu.org
-    Send-MailMessage -To $recipient -From $sender1 `
-        -Subject "HubSpotETL.py Alert" `
-        -Body "HubSpotETL.py has failed to find the daily extract files for the day." `
-        -SmtpServer "mx.kfcu.org"
-}
 
 function Send-Email {
     param (
@@ -60,15 +54,15 @@ while ($true) {
     if ($process.ExitCode -eq 0) {
         Write-Output "Python script completed successfully"
         break
-    } elseif ($process.ExitCode -eq 2) {
+    } elseif ($process.ExitCode -eq 2 -and $ProcessDate -eq "null") {
         $now = Get-Date
-        if ($now -lt $sendAlert1) {
+        if ($now -lt $eightAM ) {
             Write-Output "Files not found. Retrying in 15 minutes..."
         } elseif (-not $emailSent) {
-            Write-Output "Still failing after 9 AM. Sending alert email..."
+            Write-Output "Still failing after 8 AM. Sending alert email..."
             Send-Email `
                 -Subject "HubSpotETL.py Alert" `
-                -Body "HubSpotETL.py has failed to find the daily extract files by 9AM. Process will retry every 15 minutes until 3PM today."
+                -Body "HubSpotETL.py has failed to find the daily extract files by 8AM. Process will retry every 15 minutes until 3PM today."
             $emailSent = $true
         }
 
@@ -78,6 +72,7 @@ while ($true) {
             Write-Output "Reached 3 PM. Stopping retries, reporting failure."
             exit 2
         }
+    
     } else {
         Write-Output "Python script failed with unexpected exit code: $($process.ExitCode)"
         exit 1
