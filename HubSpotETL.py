@@ -41,7 +41,7 @@ def cleanup_staging_folder(staging_folder):
         raise
 
 
-def copy_files_to_network(files, source_folder, network_folder):
+def copy_files_to_network(files, yesterday, source_folder, network_folder):
     try:
         # Ensure the network folder exists and is a directory
         if not os.path.exists(network_folder):
@@ -75,8 +75,8 @@ def copy_files_to_network(files, source_folder, network_folder):
         sys.exit(1)
         raise
 
-    today = date.today()
-    yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
+    # today = date.today()
+    # yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
 
     # Create a subfolder in the network folder
     dated_network_folder = os.path.join(network_folder, yesterday)
@@ -130,9 +130,34 @@ def mask_column(series):
     )
 
 
-def process_extract_card(file_path):
+def process_extract_card(PROCESSDATE):
+    # Find subfolder(YYYYMMDD) in source_folder ("\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000")
+    subfolder_path = os.path.join(SOURCE_FOLDER, PROCESSDATE)
+    extract_card_path = os.path.join(subfolder_path, "EXTRACT.CARD")
+
+    lastfile_path = os.path.join(subfolder_path, "XTRACT_LASTFILE.txt")
+    if os.path.exists(lastfile_path):
+        logger.info(f"Found {lastfile_path}")
+    else:
+        print(f"File {lastfile_path} not found. Extract incomplete.")
+        logger.warning(f"File {lastfile_path} not found. Extract incomplete.")
+        sys.exit(2)
+
+    if os.path.exists(extract_card_path):
+        if not os.path.exists(STAGING_FOLDER):
+            os.makedirs(STAGING_FOLDER, exist_ok=True)
+        dest_path = os.path.join(STAGING_FOLDER, "EXTRACT.CARD")
+        shutil.copyfile(extract_card_path, dest_path)
+        print(f"Copied {extract_card_path} to {dest_path}")
+        logger.info(f"Copied {extract_card_path} to {dest_path}")
+
+    else:
+        print(f"File {extract_card_path} not found.")
+        logger.warning(f"File {extract_card_path} not found.")
+        sys.exit(2)
+
     # Read the file with no header, ~ delimiter
-    df = pd.read_csv(file_path, delimiter="~", header=None, dtype=str)
+    df = pd.read_csv(dest_path, delimiter="~", header=None, dtype=str)
     # Mask the 3rd column (index 2)
     df[2] = mask_column(df[2])
     print("Processed EXTRACT.CARD file and masked the 3rd column.")
@@ -225,7 +250,7 @@ def get_process_date():
                     process_date = config["ProcessDate"]
             except Exception as e:
                 print(f"Warning: Could not read config.json: {e}")
-    return process_date.strftime("%Y%m%d")
+    return process_date
 
 
 # Main function
@@ -235,31 +260,31 @@ def main(start_time):
         # Define schedule
         # today = date.today()
         # yesterday = (today - pd.Timedelta(days=1)).strftime("%Y%m%d")
-        
-        yesterday = get_process_date()
-        print(f"Using process date: {yesterday}")
-        logger.info(f"Using process date: {yesterday}")
-        
-        # Find subfolder(YYYYMMDD) in source_folder ("\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000")
-        subfolder_path = os.path.join(SOURCE_FOLDER, yesterday)
-        extract_card_path = os.path.join(subfolder_path, "EXTRACT.CARD")
 
-        if os.path.exists(extract_card_path):
-            if not os.path.exists(STAGING_FOLDER):
-                os.makedirs(STAGING_FOLDER, exist_ok=True)
-            dest_path = os.path.join(STAGING_FOLDER, "EXTRACT.CARD")
-            shutil.copyfile(extract_card_path, dest_path)
-            print(f"Copied {extract_card_path} to {dest_path}")
-            logger.info(f"Copied {extract_card_path} to {dest_path}")
+        PROCESSDATE = get_process_date()
+        print(f"Using process date: {PROCESSDATE}")
+        logger.info(f"Using process date: {PROCESSDATE}")
 
-        else:
-            print(f"File {extract_card_path} not found.")
-            logger.warning(f"File {extract_card_path} not found.")
-            sys.exit(2)
+        print("Processing EXTRACT.CARD file...")
+        # # Find subfolder(YYYYMMDD) in source_folder ("\\vsarcu02\k$\ARCUFTP_ARCHIVE\SYM000")
+        # subfolder_path = os.path.join(SOURCE_FOLDER, PROCESSDATE)
+        # extract_card_path = os.path.join(subfolder_path, "EXTRACT.CARD")
+
+        # if os.path.exists(extract_card_path):
+        #     if not os.path.exists(STAGING_FOLDER):
+        #         os.makedirs(STAGING_FOLDER, exist_ok=True)
+        #     dest_path = os.path.join(STAGING_FOLDER, "EXTRACT.CARD")
+        #     shutil.copyfile(extract_card_path, dest_path)
+        #     print(f"Copied {extract_card_path} to {dest_path}")
+        #     logger.info(f"Copied {extract_card_path} to {dest_path}")
+
+        # else:
+        #     print(f"File {extract_card_path} not found.")
+        #     logger.warning(f"File {extract_card_path} not found.")
+        #     sys.exit(2)
 
         # Process the file and mask the 3rd column
-        print("Processing EXTRACT.CARD file...")
-        df = process_extract_card(dest_path)
+        df = process_extract_card(PROCESSDATE)
 
         print(df.head())  # Show a preview or continue processing as needed
         logger.info(f"Processed data:\n{df.head()}")
@@ -278,11 +303,11 @@ def main(start_time):
 
         print("Zipping network folder...")
         logger.info("Zipping network folder...")
-        zip_network_folder(DESTINATION_FOLDER, yesterday)
+        zip_network_folder(DESTINATION_FOLDER, PROCESSDATE)
 
         print("Cleaning up network folder...")
         logger.info("Cleaning up network folder...")
-        cleanup_network_folder(DESTINATION_FOLDER, yesterday)
+        cleanup_network_folder(DESTINATION_FOLDER, PROCESSDATE)
 
         print("Cleaning up staging folder...")
         logger.info("Cleaning up staging folder...")

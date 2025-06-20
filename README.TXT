@@ -7,6 +7,9 @@ This script automates the extraction, transformation, and delivery of daily data
 
 How It Works:
 -------------
+
+process_date in config.json must be set to the string "null" for normal use OR a date string: "YYYYMMDD" to process a specific date
+
 1. **Locate Source Files:**  
    The script searches the source folder for a subfolder named with yesterday's date (format: YYYYMMDD). It then identifies all files in that subfolder whose names start with "EXTRACT.".
 

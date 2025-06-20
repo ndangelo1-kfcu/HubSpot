@@ -1,7 +1,7 @@
 $fileLocation = "\KFCU_SSIS\Live\HubSpot"
 $fileName = "HubSpotETL.py"
 $startTime = Get-Date
-$maxRetryTime = $startTime.AddHours(2.5)
+$sendAlert1 = $startTime.AddHours(5)
 $endTime = Get-Date -Hour 15 -Minute 0 -Second 0
 $emailSent = $false
 
@@ -24,6 +24,24 @@ function Send-AlertEmail2 { #devprod@kfcu.org
         -SmtpServer "mx.kfcu.org"
 }
 
+function Send-Email {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$Subject,
+        [Parameter(Mandatory=$true)]
+        [string]$Body
+    )
+
+    $smtpServer = "mx.kfcu.org"
+    $smtpFrom = "svcui@kfcu.org"
+    $smtpTo = "ndangelo@kfcu.org"
+
+    Send-MailMessage -From $smtpFrom -To $smtpTo -Subject $Subject -Body $Body -SmtpServer $smtpServer
+}
+
+# Example usage:
+# Send-Email -Subject "Test Subject" -Body "This is the body of the email."
+
 while ($true) {
     # Activate the virtual environment
     & ("\\vsarcu02\c$\" + $fileLocation + "\venv\Scripts\Activate.ps1")
@@ -44,20 +62,21 @@ while ($true) {
         break
     } elseif ($process.ExitCode -eq 2) {
         $now = Get-Date
-        if ($now -lt $maxRetryTime) {
+        if ($now -lt $sendAlert1) {
             Write-Output "Files not found. Retrying in 15 minutes..."
         } elseif (-not $emailSent) {
-            Write-Output "Still failing after 2.5 hours. Sending alert email..."
-            Send-AlertEmail1
+            Write-Output "Still failing after 9 AM. Sending alert email..."
+            Send-Email `
+                -Subject "HubSpotETL.py Alert" `
+                -Body "HubSpotETL.py has failed to find the daily extract files by 9AM. Process will retry every 15 minutes until 3PM today."
             $emailSent = $true
         }
 
         if ($now -lt $endTime) {
             Start-Sleep -Seconds 900  # Wait 15 minutes
         } else {
-            Write-Output "Reached 3 PM. Stopping retries."
-            Send-AlertEmail2
-            break
+            Write-Output "Reached 3 PM. Stopping retries, reporting failure."
+            exit 2
         }
     } else {
         Write-Output "Python script failed with unexpected exit code: $($process.ExitCode)"
