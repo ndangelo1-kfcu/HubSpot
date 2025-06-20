@@ -177,7 +177,7 @@ def process_extract_card(PROCESSDATE):
     # Read the file with no header, ~ delimiter
     df = pd.read_csv(dest_path, delimiter="~", header=None, dtype=str)
     # Mask the 3rd column (index 2)
-    df[2] = mask_column(df[2])
+    df[2] = slice_last4_column(df[2])
 
     # # Add two null columns to the end of df
     # df[len(df.columns)] = None
